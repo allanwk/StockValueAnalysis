@@ -10,9 +10,12 @@ from stockInfo import *
 from datetime import date, timedelta
 from dotenv import load_dotenv
 
-
+#Carregamento das variáveis de ambiente (IDs das planilhas do Google Sheets)
 load_dotenv()
+
+#Escopos de autorização da API do Sheets
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
 driver = webdriver.Chrome(executable_path=r'C:\bin\chromedriver.exe')
 start_at = ""
 
@@ -65,6 +68,7 @@ def main():
         ticker_df.at[index, "EPS"] = checkNa(eps)
         ticker_df.at[index, "P/E * P/B"] = ticker_df.at[index, "P/E"] * ticker_df.at[index, "P/B"]
         
+        #Classificação da empresa com relação à capitalização de mercado
         multiplier = market_cap[-1]
         market_cap = float(market_cap[:-1])
         if multiplier == "M":
