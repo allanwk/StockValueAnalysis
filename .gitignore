@@ -1,0 +1,7 @@
+*.xls
+.env
+*.json
+*.pickle
+*.txt
+__pycache__/
+*.log
