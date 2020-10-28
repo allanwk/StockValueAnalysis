@@ -6,6 +6,7 @@ from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pandas as pd
+import pandas_datareader.data as data
 from stockInfo import *
 from datetime import date, timedelta
 from dotenv import load_dotenv
@@ -16,7 +17,7 @@ load_dotenv()
 #Escopos de autorização da API do Sheets
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-driver = webdriver.Chrome(executable_path=r'C:\bin\chromedriver.exe')
+#driver = webdriver.Chrome(executable_path=r'C:\bin\chromedriver.exe')
 start_at = ""
 
 def main():
@@ -60,14 +61,14 @@ def main():
         if start_at != "" and start_at != row["Simbolo"]:
             continue
         
-        print("Buscando valores: P/E, P/B, EPS")
         print("Empresa {}/{}".format(index+1, len(ticker_df.index)))
-        pe,pb,eps,market_cap = getStatistics(row["Simbolo"], driver)
+        pe, pb, eps, market_cap, price = getStatistics(row["Simbolo"])
         ticker_df.at[index, "P/E"] = checkNa(pe)
         ticker_df.at[index, "P/B"] = checkNa(pb)
         ticker_df.at[index, "EPS"] = checkNa(eps)
         ticker_df.at[index, "P/E * P/B"] = ticker_df.at[index, "P/E"] * ticker_df.at[index, "P/B"]
-        
+        ticker_df.at[index, "Preço"] = checkNa(price)
+
         #Classificação da empresa com relação à capitalização de mercado
         multiplier = market_cap[-1]
         market_cap = float(market_cap[:-1])
@@ -87,24 +88,6 @@ def main():
             market_cap_class = "Large-cap"
 
         ticker_df.at[index, "Market Cap Class"] = market_cap_class
-
-        t = row["Simbolo"] + '.SA'
-        yesterday = date.today() - timedelta(days=1)
-        try:
-            pr = data.DataReader(t, 'yahoo', yesterday - timedelta(days=1), yesterday)
-            ticker_df.at[index, "Preço"] = pr.tail(1)["Close"]
-        except:
-            ticker_df.at[index, "Preço"] = 0
-        if (float(row["P/B"]) == 0.0) or (float(row["P/E"]) == 0.0 and float(row["EPS"]) == 0.0):
-                print("Refazendo buscas")
-                print("Empresa {}/{}".format(index+1, len(ticker_df.index)))
-                pe,pb,eps,market_cap = getStatistics(row["Simbolo"], driver)
-                ticker_df.at[index, "P/E"] = checkNa(pe)
-                ticker_df.at[index, "P/B"] = checkNa(pb)
-                ticker_df.at[index, "P/E * P/B"] = ticker_df.at[index, "P/E"] * ticker_df.at[index, "P/B"]
-                ticker_df.at[index, "EPS"] = checkNa(eps)
-                ticker_df.at[index, "Market Cap Class"] = market_cap
-                os.system('cls')
         ticker_df.to_excel('output_backup.xls')
     
 
