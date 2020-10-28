@@ -8,8 +8,8 @@ from google.auth.transport.requests import Request
 import pandas as pd
 import pandas_datareader.data as data
 from stockInfo import *
-from datetime import date, timedelta
 from dotenv import load_dotenv
+from progress.bar import ChargingBar
 
 #Carregamento das variáveis de ambiente (IDs das planilhas do Google Sheets)
 load_dotenv()
@@ -18,7 +18,7 @@ load_dotenv()
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 #driver = webdriver.Chrome(executable_path=r'C:\bin\chromedriver.exe')
-start_at = ""
+remove_list = []
 
 def main():
     #Autenticacao utilizando credenciais no arquivo JSON ou arquivo PICKLE
@@ -51,56 +51,70 @@ def main():
     labels = ["Simbolo", "P/E", "P/B", "EPS", "P/E * P/B", "Preço", "Valor intrinseco", "Current BV", "Old BV", "Years", "1Y Dividends", "Market Cap Class"]
     ticker_df = pd.DataFrame(columns=labels)
     ticker_df["Simbolo"] = ticker_data[0]
-    
-    start_at = input("Começar de uma empresa específica? (Simbolo):")
+
+    os.system('cls')
+    bar = ChargingBar('Analisando ações.', max = len(ticker_df.index))
 
     for index, row in ticker_df.iterrows():
+        os.system('cls')
+        bar.next()
         #Buscando empresa específica para começar
-        if start_at == row["Simbolo"]:
-            start_at = ""
-        if start_at != "" and start_at != row["Simbolo"]:
-            continue
         
-        print("Empresa {}/{}".format(index+1, len(ticker_df.index)))
+        #print("Empresa {}/{}".format(index+1, len(ticker_df.index)))
         pe, pb, eps, market_cap, price = getStatistics(row["Simbolo"])
         ticker_df.at[index, "P/E"] = checkNa(pe)
         ticker_df.at[index, "P/B"] = checkNa(pb)
         ticker_df.at[index, "EPS"] = checkNa(eps)
+
+        #Se as métricas acima forem todas nulas, a ação não foi encontrada, portanto deve ser removida do Dataframe
+        if ticker_df.at[index, "P/E"] == 0 and ticker_df.at[index, "EPS"] == 0:
+            remove_list.append(index)
+            continue
+
         ticker_df.at[index, "P/E * P/B"] = ticker_df.at[index, "P/E"] * ticker_df.at[index, "P/B"]
         ticker_df.at[index, "Preço"] = checkNa(price)
 
         #Classificação da empresa com relação à capitalização de mercado
-        multiplier = market_cap[-1]
-        market_cap = float(market_cap[:-1])
-        if multiplier == "M":
-            market_cap *= 1000000
-        elif multiplier == "B":
-            market_cap *= 1000000000
+        try:
+            multiplier = market_cap[-1]
+            market_cap = float(market_cap[:-1])
+            if multiplier == "M":
+                market_cap *= 1000000
+            elif multiplier == "B":
+                market_cap *= 1000000000
 
-        market_cap_class = ""
-        if market_cap <= 1700000000:
-            market_cap_class = "Micro-cap"
-        elif market_cap <= 11300000000:
-            market_cap_class = "Small-cap"
-        elif market_cap <= 56000000000:
-            market_cap_class = "Mid-cap"
-        else:
-            market_cap_class = "Large-cap"
+            market_cap_class = ""
+            if market_cap <= 1700000000:
+                market_cap_class = "Micro-cap"
+            elif market_cap <= 11300000000:
+                market_cap_class = "Small-cap"
+            elif market_cap <= 56000000000:
+                market_cap_class = "Mid-cap"
+            else:
+                market_cap_class = "Large-cap"
 
-        ticker_df.at[index, "Market Cap Class"] = market_cap_class
+            ticker_df.at[index, "Market Cap Class"] = market_cap_class
+        except:
+            print("Ação {} não encontrada.".format(row["Simbolo"]))
+
         ticker_df.to_excel('output_backup.xls')
     
-
+    bar.finish()
     """Carregando dataframe do backup local, para caso a análise tenha sido fragmentada,
     para salvar os resultados na nuvem, já filtrando apenas ações sub-valorizadas"""
 
+    #Limpando a planilha de saída no Google Sheets
+    result = sheet.values().clear(
+        spreadsheetId=os.environ.get("OUTPUT_SPREADSHEET_ID"),
+        range='A2:L366').execute()
+
     ticker_df = pd.read_excel(r'C:\Users\allan\Documents\StockValueAnalysis\output_backup.xls', usecols="B:M")
+    ticker_df = ticker_df.drop(remove_list)
     ticker_df = ticker_df.sort_values(by="P/E * P/B")
     ticker_df = ticker_df.fillna(0)
-    values = []
-    for index, row in ticker_df.iterrows():
-        if row["EPS"] >= 0 and row["P/E * P/B"] <= 22.5:
-            values.append(list(row))
+
+    values = [list(row) for index, row in ticker_df.iterrows() if row["EPS"] >= 0 and row["P/E * P/B"] <= 22.5]
+
     body = {"values": values}
     result = sheets_service.spreadsheets().values().update(
         spreadsheetId = os.environ.get("OUTPUT_SPREADSHEET_ID"),
@@ -108,7 +122,6 @@ def main():
         valueInputOption="RAW",
         body=body).execute()
     print('{0} celulas atualizadas na planilha na nuvem.'.format(result.get('updatedCells')))
-    driver.close()
 
 if __name__ == '__main__':
     main()
