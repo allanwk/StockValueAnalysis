@@ -38,9 +38,16 @@ def main():
 
     #Inicializando o serviço sheets
     sheets_service = build('sheets', 'v4', credentials=creds)
-
-    #Acessando valores da planilha tickers
     sheet = sheets_service.spreadsheets()
+
+    #Acessando a planilha blacklist
+    result = sheet.values().get(
+        spreadsheetId=os.environ.get("BLACKLIST_SPREADSHEET_ID"),
+        range='A1:A366',
+        majorDimension='COLUMNS').execute()
+    blacklist = {i: 0 for i in result.get('values', [])[0]}
+    
+    #Acessando valores da planilha tickers
     result = sheet.values().get(
         spreadsheetId=os.environ.get("MASTER_SPREADSHEET_ID"),
         range='A2:A366',
@@ -48,7 +55,8 @@ def main():
     ticker_data = result.get('values', [])
 
     #Convertendo para Dataframe
-    labels = ["Simbolo", "P/E", "P/B", "EPS", "P/E * P/B", "Preço", "Valor intrinseco", "Current BV", "Old BV", "Years", "1Y Dividends", "Market Cap Class"]
+    labels = ["Simbolo", "P/E", "P/B", "EPS", "P/E * P/B", "Preço", "Valor intrinseco", "Current BV",
+              "Old BV", "Years", "1Y Dividends", "Market Cap Class", "Price / Intrinsic Value", "Average Change in Book Value"]
     ticker_df = pd.DataFrame(columns=labels)
     ticker_df["Simbolo"] = ticker_data[0]
 
@@ -58,8 +66,11 @@ def main():
     for index, row in ticker_df.iterrows():
         os.system('cls')
         bar.next()
-        #Buscando empresa específica para começar
-        
+        #Se a empresa estiver na planilha Blacklist, pular e remover do dataframe
+        if row["Simbolo"] in blacklist:
+            remove_list.append(index)
+            continue
+
         #print("Empresa {}/{}".format(index+1, len(ticker_df.index)))
         pe, pb, eps, market_cap, price = getStatistics(row["Simbolo"])
         ticker_df.at[index, "P/E"] = checkNa(pe)
@@ -67,7 +78,7 @@ def main():
         ticker_df.at[index, "EPS"] = checkNa(eps)
 
         #Se as métricas acima forem todas nulas, a ação não foi encontrada, portanto deve ser removida do Dataframe
-        if ticker_df.at[index, "P/E"] == 0 and ticker_df.at[index, "EPS"] == 0:
+        if (ticker_df.at[index, "P/E"] == 0 and ticker_df.at[index, "EPS"] == 0) or float(ticker_df.at[index, "P/E * P/B"]) == 0:
             remove_list.append(index)
             continue
 
@@ -106,7 +117,7 @@ def main():
     #Limpando a planilha de saída no Google Sheets
     result = sheet.values().clear(
         spreadsheetId=os.environ.get("OUTPUT_SPREADSHEET_ID"),
-        range='A2:L366').execute()
+        range='A2:N366').execute()
 
     ticker_df = pd.read_excel(r'C:\Users\allan\Documents\StockValueAnalysis\output_backup.xls', usecols="B:M")
     ticker_df = ticker_df.drop(remove_list)
@@ -118,7 +129,7 @@ def main():
     body = {"values": values}
     result = sheets_service.spreadsheets().values().update(
         spreadsheetId = os.environ.get("OUTPUT_SPREADSHEET_ID"),
-        range='A2:L366',
+        range='A2:N366',
         valueInputOption="RAW",
         body=body).execute()
     print('{0} celulas atualizadas na planilha na nuvem.'.format(result.get('updatedCells')))

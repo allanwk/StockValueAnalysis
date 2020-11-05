@@ -4,5 +4,6 @@
 *.pickle
 *.txt
 __pycache__/
+graphs_storage/
 *.log
 stockInfoDeprecated.py
