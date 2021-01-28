@@ -9,7 +9,7 @@ import pandas as pd
 import pandas_datareader.data as data
 from stockInfo import *
 from dotenv import load_dotenv
-from progress.bar import ChargingBar
+import progressbar
 
 #Carregamento das variáveis de ambiente (IDs das planilhas do Google Sheets)
 load_dotenv()
@@ -60,12 +60,10 @@ def main():
     ticker_df = pd.DataFrame(columns=labels)
     ticker_df["Simbolo"] = ticker_data[0]
 
-    os.system('cls')
-    bar = ChargingBar('Analisando ações.', max = len(ticker_df.index))
+    bar = progressbar.ProgressBar(max_value=len(ticker_df.index))
 
     for index, row in ticker_df.iterrows():
-        os.system('cls')
-        bar.next()
+        bar.update(index)
         #Se a empresa estiver na planilha Blacklist, pular e remover do dataframe
         if row["Simbolo"] in blacklist:
             remove_list.append(index)
@@ -110,7 +108,6 @@ def main():
 
         ticker_df.to_excel('output_backup.xls')
     
-    bar.finish()
     """Carregando dataframe do backup local, para caso a análise tenha sido fragmentada,
     para salvar os resultados na nuvem, já filtrando apenas ações sub-valorizadas"""
 
