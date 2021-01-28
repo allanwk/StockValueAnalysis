@@ -61,6 +61,7 @@ def main():
     ticker_df["Simbolo"] = ticker_data[0]
 
     bar = progressbar.ProgressBar(max_value=len(ticker_df.index))
+    print("Obtendo informações sobre as ações.")
 
     for index, row in ticker_df.iterrows():
         bar.update(index)
@@ -106,7 +107,7 @@ def main():
         except:
             print("Ação {} não encontrada.".format(row["Simbolo"]))
 
-        ticker_df.to_excel('output_backup.xls')
+        ticker_df.to_excel('output_backup.xlsx')
     
     """Carregando dataframe do backup local, para caso a análise tenha sido fragmentada,
     para salvar os resultados na nuvem, já filtrando apenas ações sub-valorizadas"""
@@ -116,7 +117,7 @@ def main():
         spreadsheetId=os.environ.get("OUTPUT_SPREADSHEET_ID"),
         range='A2:N366').execute()
 
-    ticker_df = pd.read_excel(r'C:\Users\allan\Documents\StockValueAnalysis\output_backup.xls', usecols="B:M")
+    ticker_df = pd.read_excel(r'C:\Users\allan\Documents\StockValueAnalysis\output_backup.xlsx', usecols="B:M")
     ticker_df = ticker_df.drop(remove_list)
     ticker_df = ticker_df.sort_values(by="P/E * P/B")
     ticker_df = ticker_df.fillna(0)
